@@ -1,12 +1,20 @@
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::path::Path;
 use std::process;
+
+use image::{ImageBuffer, RgbImage};
 
 #[derive(Debug)]
 pub struct Config {
     pub img_path: String,
     pub reduce_by: u32,
+}
+
+pub struct OpenImage {
+    pub img: RgbImage,
+    pub dims: (u32, u32),
 }
 
 impl Config {
@@ -35,3 +43,11 @@ impl Config {
         })
     }
 }
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let img = image::open(Path::new(&config.img_path))?.to_rgb();
+    let dims = img.dimensions();
+    let opened_image = OpenImage { img, dims };
+    Ok(())
+}
+   k

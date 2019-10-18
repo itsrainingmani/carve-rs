@@ -21,4 +21,9 @@ fn main() {
     });
 
     println!("{:?}", config);
+
+    if let Err(e) = carvers::run(config) {
+        eprintln!("Applicatio error: {}", e);
+        process::exit(1);
+    }
 }
