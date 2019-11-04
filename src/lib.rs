@@ -50,4 +50,3 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let opened_image = OpenImage { img, dims };
     Ok(())
 }
-   k
