@@ -6,6 +6,46 @@ use std::process;
 
 use image::{ImageBuffer, RgbImage};
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_image_dimensions() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let opened_image = OpenImage { img, dims };
+
+        assert_eq!((1024, 694), opened_image.dims);
+    }
+
+    #[test]
+    fn print_rgb_first_row() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let opened_image = OpenImage { img, dims };
+
+        for i in 0..dims.1 {
+            println!("{:?}", opened_image.img.get_pixel(0, i));
+        }
+    }
+
+    #[test]
+    fn check_energy_calc() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let opened_image = OpenImage { img, dims };
+
+        assert_eq!(0, opened_image.pixel_energy((10, 10)));
+    }
+}
+
 #[derive(Debug)]
 pub struct Config {
     pub img_path: String,
@@ -14,7 +54,24 @@ pub struct Config {
 
 pub struct OpenImage {
     pub img: RgbImage,
-    pub dims: (u32, u32),
+    pub dims: (u32, u32), //(width, height)
+}
+
+impl OpenImage {
+    pub fn pixel_energy(&self, pos: (u32, u32)) -> usize {
+        println!(
+            "The pixel RGB Vals are {:?}",
+            self.img.get_pixel(pos.0, pos.1)
+        );
+        match pos {
+            (0, 0) => println!("Top Left Corner"),
+            (0, y) => println!("Top Border"),
+            (x, 0) => println!("Left Border"),
+            (x, y) => {}
+        }
+
+        0
+    }
 }
 
 impl Config {
