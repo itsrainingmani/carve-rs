@@ -17,6 +17,9 @@ mod tests {
             .to_rgb();
         let dims = img.dimensions();
         let opened_image = OpenImage { img, dims };
+        let raw_data = opened_image.img.into_vec();
+        let raw_buffer: std::vec::Vec<_> = raw_data.chunks_exact(3).collect();
+        println!("{:?}", raw_buffer);
 
         assert_eq!((1024, 694), opened_image.dims);
     }
