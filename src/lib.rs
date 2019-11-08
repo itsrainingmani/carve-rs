@@ -82,6 +82,49 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn check_lower_edge_pixels() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let buffer = img.to_vec();
+        let opened_image = OpenImage { img, dims, buffer };
+
+        println!("{:?}", opened_image.get_lower_edges((3, 4)).unwrap());
+        println!("{:?}", opened_image.get_lower_edges((0, 0)).unwrap());
+    }
+
+    #[test]
+    fn find_min_energy() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let buffer = img.to_vec();
+        let oi = OpenImage { img, dims, buffer };
+        let first_row_energy: Vec<i32> = oi
+            .img
+            .rows()
+            .enumerate()
+            .map(|(i, _)| oi.pixel_energy((i as u32, 0)))
+            .collect();
+
+        // Get the minimum pixel energy in the first row
+        let min_energy_pixel = first_row_energy.iter().min().unwrap();
+        let min_energy_pixel_pos = first_row_energy
+            .iter()
+            .position(|&x| x == *min_energy_pixel)
+            .unwrap() as u32;
+
+        println!(
+            "{:?}, {:?}, {:?}",
+            min_energy_pixel, min_energy_pixel_pos, 0
+        );
+
+        println!("{:?}", oi.get_lower_edges((min_energy_pixel_pos, 0)));
+    }
 }
 
 #[derive(Debug)]
@@ -116,8 +159,8 @@ impl PartialEq for AdjacentPixels {
 
 impl OpenImage {
     pub fn pixel_energy(&self, pos: (u32, u32)) -> i32 {
-        let px = self.img.get_pixel(pos.0, pos.1);
-        println!("The pixel RGB Vals are {}, {}, {}", px[0], px[1], px[2]);
+        // let px = self.img.get_pixel(pos.0, pos.1);
+        // println!("The pixel RGB Vals are {}, {}, {}", px[0], px[1], px[2]);
         let adj_px = self.get_adjacent_pixels(pos);
 
         let rx = self.img.get_pixel(adj_px.left.0, adj_px.left.1)[0] as i32
@@ -195,7 +238,7 @@ impl OpenImage {
         } else {
             let possibilities = vec![(pos.0, down_row), (pos.0 + 1, down_row)];
             if pos.0 > 0 {
-                down_indices.push((0, down_row));
+                down_indices.push((pos.0 - 1, down_row));
             }
             for (col, _) in possibilities {
                 if col <= self.dims.1 - 1 {
@@ -258,18 +301,16 @@ fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
     loop {
         match oi.get_lower_edges(*computed_seam.last().unwrap()) {
             Ok((r, v)) => {
-                let row_energy: Vec<i32> = v
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| oi.pixel_energy((r, i as u32)))
-                    .collect();
+                println!("{:?}", (&r, &v));
+                let row_energy: Vec<i32> =
+                    v.iter().map(|(i, j)| oi.pixel_energy((*i, *j))).collect();
 
                 let min_energy_pixel = row_energy.iter().min().unwrap();
                 let min_energy_pixel_pos = row_energy
                     .iter()
                     .position(|&x| x == *min_energy_pixel)
-                    .unwrap() as u32;
-                computed_seam.push((min_energy_pixel_pos, r));
+                    .unwrap();
+                computed_seam.push(*v.get(min_energy_pixel_pos).unwrap());
             }
             Err(_) => break,
         }
