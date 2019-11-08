@@ -128,7 +128,7 @@ impl OpenImage {
             - self.img.get_pixel(adj_px.right.0, adj_px.right.1)[2] as i32;
 
         let delta_x_squared = (rx * rx) + (gx * gx) + (bx * bx);
-        println!("dx^2: {}", delta_x_squared);
+        // println!("dx^2: {}", delta_x_squared);
 
         let ry = self.img.get_pixel(adj_px.up.0, adj_px.up.1)[0] as i32
             - self.img.get_pixel(adj_px.down.0, adj_px.down.1)[0] as i32;
@@ -138,7 +138,7 @@ impl OpenImage {
             - self.img.get_pixel(adj_px.down.0, adj_px.down.1)[2] as i32;
 
         let delta_y_squared = (ry * ry) + (gy * gy) + (by * by);
-        println!("dy^2: {}", delta_y_squared);
+        // println!("dy^2: {}", delta_y_squared);
 
         delta_x_squared + delta_y_squared
     }
@@ -181,6 +181,31 @@ impl OpenImage {
             down: (pos.0, y_down),
         }
     }
+
+    // for a given index (col, row), this yields a vector of the indexes of the pixels directly
+    // below it
+    // Example:
+    // the lower edges for an index (3, 4) would give (2, 5), (3, 5), (4, 5)
+    fn get_lower_edges(&self, pos: (u32, u32)) -> Result<(u32, Vec<(u32, u32)>), &'static str> {
+        let down_row = pos.1 + 1;
+        let mut down_indices: Vec<(u32, u32)> = Vec::new();
+
+        if down_row == self.dims.1 - 1 {
+            return Err("Last row reached");
+        } else {
+            let possibilities = vec![(pos.0, down_row), (pos.0 + 1, down_row)];
+            if pos.0 > 0 {
+                down_indices.push((0, down_row));
+            }
+            for (col, _) in possibilities {
+                if col <= self.dims.1 - 1 {
+                    down_indices.push((col, down_row));
+                }
+            }
+
+            Ok((down_row, down_indices))
+        }
+    }
 }
 
 impl Config {
@@ -189,7 +214,7 @@ impl Config {
 
         let img_path = match args.next() {
             Some(arg) => arg,
-            None => return Err("Didn't get a filename"),
+            None => return Err("No filename specified"),
         };
 
         let reduce_by = match args.next() {
@@ -200,7 +225,7 @@ impl Config {
                 );
                 process::exit(1);
             }),
-            None => return Err("Didn't get the percentage to seam carve the image by"),
+            None => return Err("Missing resize percentage"),
         };
 
         Ok(Config {
@@ -210,11 +235,64 @@ impl Config {
     }
 }
 
+fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
+    let mut computed_seam: Vec<(u32, u32)> = Vec::new();
+
+    // Compute the pixel energies for the first row
+    let first_row_energy: Vec<i32> = oi
+        .img
+        .rows()
+        .enumerate()
+        .map(|(i, _)| oi.pixel_energy((i as u32, 0)))
+        .collect();
+
+    // Get the minimum pixel energy in the first row
+    let min_energy_pixel = first_row_energy.iter().min().unwrap();
+    let min_energy_pixel_pos = first_row_energy
+        .iter()
+        .position(|&x| x == *min_energy_pixel)
+        .unwrap() as u32;
+
+    computed_seam.push((min_energy_pixel_pos, 0));
+
+    loop {
+        match oi.get_lower_edges(*computed_seam.last().unwrap()) {
+            Ok((r, v)) => {
+                let row_energy: Vec<i32> = v
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| oi.pixel_energy((r, i as u32)))
+                    .collect();
+
+                let min_energy_pixel = row_energy.iter().min().unwrap();
+                let min_energy_pixel_pos = row_energy
+                    .iter()
+                    .position(|&x| x == *min_energy_pixel)
+                    .unwrap() as u32;
+                computed_seam.push((min_energy_pixel_pos, r));
+            }
+            Err(_) => break,
+        }
+    }
+    computed_seam
+}
+
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let img = image::open(Path::new(&config.img_path))?.to_rgb();
     let dims = img.dimensions();
     let buffer = img.to_vec();
     let opened_image = OpenImage { img, dims, buffer };
+
+    let mut test_image = opened_image.img.clone();
+    let vert_seam = find_vertical_seam(&opened_image);
+
+    for si in vert_seam {
+        let red_px = image::Rgb([255u8, 0u8, 0u8]);
+        test_image.put_pixel(si.0, si.1, red_px);
+    }
+
+    test_image.save(Path::new(&"images/seam_test.jpg"))?;
+    println!("Seam... Carved");
 
     Ok(())
 }
