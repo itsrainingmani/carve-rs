@@ -301,7 +301,7 @@ fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
     loop {
         match oi.get_lower_edges(*computed_seam.last().unwrap()) {
             Ok((r, v)) => {
-                println!("{:?}", (&r, &v));
+                // println!("{:?}", (&r, &v));
                 let row_energy: Vec<i32> =
                     v.iter().map(|(i, j)| oi.pixel_energy((*i, *j))).collect();
 
