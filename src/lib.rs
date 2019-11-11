@@ -2,7 +2,7 @@ use std::error::Error;
 use std::path::Path;
 use std::process;
 
-use image::RgbImage;
+use image::{RgbImage, ImageBuffer};
 
 #[cfg(test)]
 mod tests {
@@ -14,13 +14,35 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer = img.to_vec();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
         let raw_data = opened_image.img.into_vec();
         let raw_buffer: std::vec::Vec<_> = raw_data.chunks_exact(3).collect();
         println!("{:?}", raw_buffer);
 
         assert_eq!((1024, 694), opened_image.dims);
+    }
+
+    #[test]
+    fn check_image_buffer_dimensions() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let opened_image = OpenImage { img, dims, buffer };
+        let mut raw_buffer: Vec<Vec<[u8; 3]>> = Vec::new();
+        for (_, im) in opened_image.img.enumerate_rows() {
+            let mut row_vec: Vec<[u8; 3]> = Vec::new();
+            for (_i, (_, _, px)) in im.enumerate() {
+                row_vec.push([px[0], px[1], px[2]]);
+            }
+            raw_buffer.push(row_vec);
+        }
+
+        println!("{:?}, {:?}", raw_buffer.len(), raw_buffer.first().unwrap().len());
+
+        // assert_eq!((1024, 694), opened_image.dims);
     }
 
     #[test]
@@ -137,7 +159,7 @@ pub struct Config {
 pub struct OpenImage {
     pub img: RgbImage,
     pub dims: (u32, u32), //(width, height)
-    pub buffer: std::vec::Vec<u8>,
+    pub buffer: Vec<Vec<[u8; 3]>>,
 }
 
 #[derive(Debug)]
@@ -249,6 +271,11 @@ impl OpenImage {
             Ok((down_row, down_indices))
         }
     }
+
+    // fn remove_vertical_seam(&mut self, v_seam: std::vec::Vec<(u32, u32)>) {
+    //     let raw_data = self.img.into_iter();
+    //     let raw_buffer: std::vec::Vec<_> = raw_data.chunks_exact(3).collect();
+    // }
 }
 
 impl Config {
@@ -318,11 +345,34 @@ fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
     computed_seam
 }
 
+fn get_formatted_buffer(img: &RgbImage) -> Vec<Vec<[u8; 3]>> {
+    let mut buffer: Vec<Vec<[u8; 3]>> = Vec::new();
+    for (_, im) in img.enumerate_rows() {
+        let mut row_vec: Vec<[u8; 3]> = Vec::new();
+        for (_i, (_, _, px)) in im.enumerate() {
+            row_vec.push([px[0], px[1], px[2]]);
+        }
+        buffer.push(row_vec);
+    }
+
+    buffer
+}
+
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let img = image::open(Path::new(&config.img_path))?.to_rgb();
     let dims = img.dimensions();
-    let buffer = img.to_vec();
-    let opened_image = OpenImage { img, dims, buffer };
+    let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+    let mut opened_image = OpenImage { img, dims, buffer };
+
+    let seam_iterations = opened_image.dims.0 - (opened_image.dims.0 / config.reduce_by);
+
+    // for i in 0..=seam_iterations {
+    //     let vert_seam = find_vertical_seam(&opened_image);
+
+    //     for si in vert_seam {
+            
+    //     }
+    // }
 
     let mut test_image = opened_image.img.clone();
     let vert_seam = find_vertical_seam(&opened_image);
