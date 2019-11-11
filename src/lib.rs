@@ -1,9 +1,9 @@
 use std::error::Error;
+use std::ops::Deref;
 use std::path::Path;
 use std::process;
 
-use image::imageops;
-use image::{DynamicImage, RgbImage};
+use image::{imageops, DynamicImage, ImageBuffer, Pixel, RgbImage};
 
 #[cfg(test)]
 mod tests {
@@ -222,15 +222,17 @@ mod tests {
     }
 
     #[test]
-    fn generate_iamge_gradient_sobel_filter() {
+    fn generate_image_gradient_sobel_filter() {
         let img = image::open(Path::new("images/test_image.jpg"))
             .unwrap()
             .grayscale();
 
         let gradient_img = imageops::filter3x3(&img, &[1., 2., 1., 0., 0., 0., -1., -2., -1.]);
-        gradient_img
-            .save(Path::new(&"images/sobel_gradient.jpg"))
-            .unwrap();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&gradient_img);
+        println!("{:?}", buffer);
+        // gradient_img
+        //     .save(Path::new(&"images/sobel_gradient.jpg"))
+        //     .unwrap();
     }
 }
 
@@ -435,12 +437,17 @@ fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
     computed_seam
 }
 
-fn get_formatted_buffer(img: &RgbImage) -> Vec<Vec<[u8; 3]>> {
+fn get_formatted_buffer<P, Container>(img: &ImageBuffer<P, Container>) -> Vec<Vec<[u8; 3]>>
+where
+    P: Pixel<Subpixel = u8> + 'static,
+    Container: Deref<Target = [u8]>,
+{
     let mut buffer: Vec<Vec<[u8; 3]>> = Vec::new();
     for (_, im) in img.enumerate_rows() {
         let mut row_vec: Vec<[u8; 3]> = Vec::new();
         for (_i, (_, _, px)) in im.enumerate() {
-            row_vec.push([px[0], px[1], px[2]]);
+            let px_chans = px.channels();
+            row_vec.push([px_chans[0], px_chans[1], px_chans[2]]);
         }
         buffer.push(row_vec);
     }
