@@ -2,7 +2,7 @@ use std::error::Error;
 use std::path::Path;
 use std::process;
 
-use image::{RgbImage, ImageBuffer};
+use image::RgbImage;
 
 #[cfg(test)]
 mod tests {
@@ -16,9 +16,6 @@ mod tests {
         let dims = img.dimensions();
         let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
-        let raw_data = opened_image.img.into_vec();
-        let raw_buffer: std::vec::Vec<_> = raw_data.chunks_exact(3).collect();
-        println!("{:?}", raw_buffer);
 
         assert_eq!((1024, 694), opened_image.dims);
     }
@@ -31,18 +28,68 @@ mod tests {
         let dims = img.dimensions();
         let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
-        let mut raw_buffer: Vec<Vec<[u8; 3]>> = Vec::new();
-        for (_, im) in opened_image.img.enumerate_rows() {
-            let mut row_vec: Vec<[u8; 3]> = Vec::new();
-            for (_i, (_, _, px)) in im.enumerate() {
-                row_vec.push([px[0], px[1], px[2]]);
-            }
-            raw_buffer.push(row_vec);
+        assert_eq!(
+            (694, 1024),
+            (
+                opened_image.buffer.len(),
+                opened_image.buffer.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
+    fn check_length_after_seam_removal() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let mut opened_image = OpenImage { img, dims, buffer };
+
+        let seam = find_vertical_seam(&opened_image);
+        opened_image.remove_vertical_seam(seam);
+
+        assert_eq!(
+            (694, 1023),
+            (
+                opened_image.buffer.len(),
+                opened_image.buffer.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
+    fn multiple_seam_removals() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let mut opened_image = OpenImage { img, dims, buffer };
+
+        let num_seams_to_remove = 20;
+
+        for _ in 1..=num_seams_to_remove {
+            let seam = find_vertical_seam(&opened_image);
+            opened_image.remove_vertical_seam(seam);
         }
 
-        println!("{:?}, {:?}", raw_buffer.len(), raw_buffer.first().unwrap().len());
+        image::save_buffer(
+            Path::new(&"images/seam_test1_test.jpg"),
+            &opened_image.buffer.concat().concat(),
+            opened_image.dims.0,
+            opened_image.dims.1,
+            image::RGB(8),
+        )
+        .unwrap();
 
-        // assert_eq!((1024, 694), opened_image.dims);
+        assert_eq!(
+            (694, 1004),
+            (
+                opened_image.buffer.len(),
+                opened_image.buffer.first().unwrap().len()
+            )
+        );
     }
 
     #[test]
@@ -51,7 +98,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer = img.to_vec();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         for i in 0..dims.1 {
@@ -65,7 +112,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer = img.to_vec();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         assert_eq!(33822, opened_image.pixel_energy((0, 0)));
@@ -77,7 +124,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer = img.to_vec();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         let top_left_corner: (u32, u32) = (0, 0);
@@ -111,7 +158,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer = img.to_vec();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         println!("{:?}", opened_image.get_lower_edges((3, 4)).unwrap());
@@ -124,7 +171,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer = img.to_vec();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
         let oi = OpenImage { img, dims, buffer };
         let first_row_energy: Vec<i32> = oi
             .img
@@ -146,6 +193,31 @@ mod tests {
         );
 
         println!("{:?}", oi.get_lower_edges((min_energy_pixel_pos, 0)));
+    }
+
+    #[test]
+    fn put_red_px() {
+        let img = image::open(Path::new("images/test_image1.png"))
+            .unwrap()
+            .to_rgb();
+        let dims = img.dimensions();
+        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let mut oi = OpenImage { img, dims, buffer };
+        for _ in 1..=80 {
+            let seam = find_vertical_seam(&oi);
+            oi.remove_vertical_seam(seam);
+        }
+
+        println!("{} by {}", oi.dims.0, oi.dims.1);
+
+        image::save_buffer(
+            Path::new(&"images/seam_test1.jpg"),
+            &oi.buffer.concat().concat(),
+            oi.dims.0,
+            oi.dims.1,
+            image::RGB(8),
+        )
+        .unwrap();
     }
 }
 
@@ -272,10 +344,15 @@ impl OpenImage {
         }
     }
 
-    // fn remove_vertical_seam(&mut self, v_seam: std::vec::Vec<(u32, u32)>) {
-    //     let raw_data = self.img.into_iter();
-    //     let raw_buffer: std::vec::Vec<_> = raw_data.chunks_exact(3).collect();
-    // }
+    fn remove_vertical_seam(&mut self, v_seam: std::vec::Vec<(u32, u32)>) {
+        for (col, row) in v_seam {
+            if let Some(elem) = self.buffer.get_mut(row as usize) {
+                elem.remove(col as usize);
+                elem.shrink_to_fit();
+            }
+        }
+        self.dims.0 = self.dims.0 - 1;
+    }
 }
 
 impl Config {
@@ -363,26 +440,22 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let dims = img.dimensions();
     let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
     let mut opened_image = OpenImage { img, dims, buffer };
+    let seam_iterations: u32 =
+        (opened_image.dims.0 as f32 * (config.reduce_by as f32 / 100.)) as u32;
+    println!("{}", seam_iterations);
 
-    let seam_iterations = opened_image.dims.0 - (opened_image.dims.0 / config.reduce_by);
-
-    // for i in 0..=seam_iterations {
-    //     let vert_seam = find_vertical_seam(&opened_image);
-
-    //     for si in vert_seam {
-            
-    //     }
-    // }
-
-    let mut test_image = opened_image.img.clone();
-    let vert_seam = find_vertical_seam(&opened_image);
-
-    for si in vert_seam {
-        let red_px = image::Rgb([255u8, 0u8, 0u8]);
-        test_image.put_pixel(si.0, si.1, red_px);
+    for _ in 1..=seam_iterations {
+        let seam = find_vertical_seam(&opened_image);
+        opened_image.remove_vertical_seam(seam);
     }
 
-    test_image.save(Path::new(&"images/seam_test.jpg"))?;
+    image::save_buffer(
+        Path::new(&"images/seam_test1.jpg"),
+        &opened_image.buffer.concat().concat(),
+        opened_image.dims.0,
+        opened_image.dims.1,
+        image::RGB(8),
+    )?;
     println!("Seam... Carved");
 
     Ok(())
