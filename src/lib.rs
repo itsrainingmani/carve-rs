@@ -2,7 +2,8 @@ use std::error::Error;
 use std::path::Path;
 use std::process;
 
-use image::RgbImage;
+use image::imageops;
+use image::{DynamicImage, RgbImage};
 
 #[cfg(test)]
 mod tests {
@@ -218,6 +219,18 @@ mod tests {
             image::RGB(8),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn generate_iamge_gradient_sobel_filter() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        let gradient_img = imageops::filter3x3(&img, &[1., 2., 1., 0., 0., 0., -1., -2., -1.]);
+        gradient_img
+            .save(Path::new(&"images/sobel_gradient.jpg"))
+            .unwrap();
     }
 }
 
