@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process;
 
 use image::{imageops, DynamicImage, ImageBuffer, Pixel, RgbImage};
+use imageproc::*;
 
 #[cfg(test)]
 mod tests {
@@ -234,6 +235,20 @@ mod tests {
         //     .save(Path::new(&"images/sobel_gradient.jpg"))
         //     .unwrap();
     }
+
+    #[test]
+    fn test_rgb_conversions() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        imageproc::gradients::sobel_gradients(&img.as_luma8().unwrap());
+        // img.save(Path::new("images/test_image_gray.jpg")).unwrap();
+        // img.as_rgb8()
+        //     .unwrap()
+        //     .save(Path::new("images/test_image_rgb.jpg"))
+        //     .unwrap();
+    }
 }
 
 #[derive(Debug)]
@@ -359,6 +374,33 @@ impl OpenImage {
         }
     }
 
+    // for a given index (col, row), this yields a vector of the indexes of the pixels directly
+    // above it
+    // Example:
+    // the upper edges for an index (3, 4) would give (2, 3), (3, 3), (4, 3)
+    fn get_upper_edges(&self, pos: (u32, u32)) -> Result<(u32, Vec<(u32, u32)>), &'static str> {
+        let up_row = pos.1 - 1;
+        let mut up_indices: Vec<(u32, u32)> = Vec::new();
+
+        if up_row == 0 {
+            return Err("First row reached");
+        } else {
+            let possibilities = vec![(pos.0, up_row), (pos.0 + 1, up_row)];
+            if pos.0 > 0 {
+                up_indices.push((pos.0 - 1, up_row));
+            }
+            for (col, _) in possibilities {
+                if col <= self.dims.1 - 1 {
+                    up_indices.push((col, up_row));
+                }
+            }
+
+            Ok((up_row, up_indices))
+        }
+    }
+
+    // TODO
+    // This method needs to be modified to also remove the seam from the energy buffer data structure
     fn remove_vertical_seam(&mut self, v_seam: std::vec::Vec<(u32, u32)>) {
         for (col, row) in v_seam {
             if let Some(elem) = self.buffer.get_mut(row as usize) {
@@ -455,10 +497,23 @@ where
     buffer
 }
 
+fn cumulative_energy(buff: &Vec<Vec<[u8; 3]>>) -> Vec<Vec<[u8; 3]>> {
+    for j in 1..=buff.len() {}
+    buff.clone() // placeholder to remove return type error
+}
+
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let img = image::open(Path::new(&config.img_path))?.to_rgb();
     let dims = img.dimensions();
-    let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+
+    // The buffer is now a formatted object that contains the gradient magnitude
+    // values for each pixel
+    // We can then compute the cumulative energy for the buffer to use in our
+    // seam calculations
+    let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&imageops::filter3x3(
+        &img,
+        &[1., 2., 1., 0., 0., 0., -1., -2., -1.], // Sobel Filter Matrix
+    ));
     let mut opened_image = OpenImage { img, dims, buffer };
     let seam_iterations: u32 =
         (opened_image.dims.0 as f32 * (config.reduce_by as f32 / 100.)) as u32;
