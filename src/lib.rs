@@ -242,7 +242,8 @@ mod tests {
             .unwrap()
             .grayscale();
 
-        imageproc::gradients::sobel_gradients(&img.as_luma8().unwrap());
+        let sg = imageproc::gradients::sobel_gradients(&img.as_luma8().unwrap());
+        println!("{:?}", sg);
         // img.save(Path::new("images/test_image_gray.jpg")).unwrap();
         // img.as_rgb8()
         //     .unwrap()
