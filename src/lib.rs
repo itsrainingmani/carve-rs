@@ -203,9 +203,27 @@ pub struct OpenImage {
     pub img: RgbImage,
     pub dims: (u32, u32), //(width, height)
     pub buffer: Vec<Vec<[u8; 3]>>,
+    pub energy: Vec<Vec<u16>>,
 }
 
 impl OpenImage {
+    pub fn new(img_path: &String) -> Result<OpenImage, &'static str> {
+        let img_base = image::open(Path::new(img_path)).unwrap();
+
+        let img = img_base.to_rgb();
+        let dims = img.dimensions();
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
+
+        let energy = cumulative_energy(&img_base.as_luma8().unwrap());
+
+        Ok(OpenImage {
+            img,
+            dims,
+            buffer,
+            energy,
+        })
+    }
+
     // for a given index (col, row), this yields a vector of the indexes of the pixels directly
     // above it
     // Example:
@@ -349,17 +367,7 @@ fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let img_base = image::open(Path::new(&config.img_path))?;
-
-    let img = img_base.to_rgb();
-    let dims = img.dimensions();
-
-    // The buffer is now a formatted object that contains the gradient magnitude
-    // values for each pixel
-    // We can then compute the cumulative energy for the buffer to use in our
-    // seam calculations
-    let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-    let mut opened_image = OpenImage { img, dims, buffer };
+    let mut opened_image = OpenImage::new(&config.img_path)?;
     let seam_iterations: u32 =
         (opened_image.dims.0 as f32 * (config.reduce_by as f32 / 100.)) as u32;
     println!("{}", seam_iterations);
