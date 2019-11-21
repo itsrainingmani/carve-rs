@@ -92,26 +92,27 @@ mod tests {
     #[test]
     fn find_min_energy() {
         let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        let first_row_energy: Vec<i32> = oi
-            .img
-            .rows()
-            .enumerate()
-            .map(|(i, _)| oi.pixel_energy((i as u32, 0)))
-            .collect();
-
         // Get the minimum pixel energy in the first row
-        let min_energy_pixel = first_row_energy.iter().min().unwrap();
-        let min_energy_pixel_pos = first_row_energy
+        let min_energy_pixel = oi.energy.last().unwrap().iter().min().unwrap();
+        let min_energy_pixel_pos = oi
+            .energy
+            .last()
+            .unwrap()
             .iter()
             .position(|&x| x == *min_energy_pixel)
             .unwrap() as u32;
 
         println!(
             "{:?}, {:?}, {:?}",
-            min_energy_pixel, min_energy_pixel_pos, 0
+            min_energy_pixel,
+            min_energy_pixel_pos,
+            oi.dims.1 - 1
         );
 
-        println!("{:?}", oi.get_lower_edges((min_energy_pixel_pos, 0)));
+        println!(
+            "{:?}",
+            get_upper_edges(&oi.img, (min_energy_pixel_pos, oi.dims.1 - 1))
+        );
     }
 
     #[test]
@@ -211,32 +212,27 @@ impl OpenImage {
 
     fn find_vertical_seam(&self) -> Vec<(u32, u32)> {
         let mut computed_seam: Vec<(u32, u32)> = Vec::new();
-        // Compute the pixel energies for the first row
-        let first_row_energy: Vec<i32> = self
-            .img
-            .rows()
-            .enumerate()
-            .map(|(i, _)| self.pixel_energy((i as u32, 0)))
-            .collect();
         // Get the minimum pixel energy in the first row
-        let min_energy_pixel = first_row_energy.iter().min().unwrap();
-        let min_energy_pixel_pos = first_row_energy
+
+        let min_energy_pixel = self.energy.last().unwrap().iter().min().unwrap();
+        let min_energy_pixel_pos = self
+            .energy
+            .last()
+            .unwrap()
             .iter()
             .position(|&x| x == *min_energy_pixel)
             .unwrap() as u32;
-        computed_seam.push((min_energy_pixel_pos, 0));
+        computed_seam.push((min_energy_pixel_pos, self.dims.1 - 1));
         loop {
-            match oi.get_lower_edges(*computed_seam.last().unwrap()) {
-                Ok((_, v)) => {
-                    // println!("{:?}", (&r, &v));
-                    let row_energy: Vec<i32> =
-                        v.iter().map(|(i, j)| self.pixel_energy((*i, *j))).collect();
-                    let min_energy_pixel = row_energy.iter().min().unwrap();
-                    let min_energy_pixel_pos = row_energy
+            match get_upper_edges(&self.img, *computed_seam.first().unwrap()) {
+                Ok((r, v)) => {
+                    let energy_row = self.energy.get(r as usize).unwrap();
+                    let min_energy_pixel = energy_row.iter().min().unwrap();
+                    let min_energy_pixel_pos = energy_row
                         .iter()
                         .position(|&x| x == *min_energy_pixel)
                         .unwrap();
-                    computed_seam.push(*v.get(min_energy_pixel_pos).unwrap());
+                    computed_seam.insert(0, *v.get(min_energy_pixel_pos).unwrap());
                 }
                 Err(_) => break,
             }
@@ -310,7 +306,6 @@ where
 
 fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
     let sobel = gradients::sobel_gradients(gradient);
-    println!("{:?}", sobel);
     let mut buffer: Vec<Vec<u16>> = Vec::new();
     for (_, im) in sobel.enumerate_rows() {
         let mut row_vec: Vec<u16> = Vec::new();
