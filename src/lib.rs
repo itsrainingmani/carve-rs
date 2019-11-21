@@ -326,10 +326,16 @@ fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
         buffer.push(row_vec);
     }
 
-    for r in buffer.iter() {
-        // for p in *r.iter(){
-        //     let upper_px =
-        // }
+    for (r, row) in buffer.iter_mut().enumerate() {
+        for (c, px) in row.iter_mut().enumerate() {
+            let (_, ue) = get_upper_edges(gradient, (r as u32, c as u32)).unwrap();
+            let actual_energies: u16 = ue
+                .iter()
+                .map(|(x, y)| *buffer.get(*x as usize).unwrap().get(*y as usize).unwrap())
+                .min()
+                .unwrap();
+            *px += actual_energies;
+        }
     }
     buffer
 }
