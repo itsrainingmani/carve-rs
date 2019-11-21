@@ -156,6 +156,33 @@ pub struct Config {
     pub reduce_by: u32,
 }
 
+impl Config {
+    pub fn new(mut args: std::env::Args) -> Result<Config, &'static str> {
+        args.next();
+
+        let img_path = match args.next() {
+            Some(arg) => arg,
+            None => return Err("No filename specified"),
+        };
+
+        let reduce_by = match args.next() {
+            Some(arg) => arg.parse().unwrap_or_else(|err| {
+                eprintln!(
+                    "Couldn't parse the provided argument as an integer: {}",
+                    err
+                );
+                process::exit(1);
+            }),
+            None => return Err("Missing resize percentage"),
+        };
+
+        Ok(Config {
+            img_path,
+            reduce_by,
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct OpenImage {
     pub img: RgbImage,
@@ -192,33 +219,6 @@ impl OpenImage {
             }
         }
         self.dims.0 = self.dims.0 - 1;
-    }
-}
-
-impl Config {
-    pub fn new(mut args: std::env::Args) -> Result<Config, &'static str> {
-        args.next();
-
-        let img_path = match args.next() {
-            Some(arg) => arg,
-            None => return Err("No filename specified"),
-        };
-
-        let reduce_by = match args.next() {
-            Some(arg) => arg.parse().unwrap_or_else(|err| {
-                eprintln!(
-                    "Couldn't parse the provided argument as an integer: {}",
-                    err
-                );
-                process::exit(1);
-            }),
-            None => return Err("Missing resize percentage"),
-        };
-
-        Ok(Config {
-            img_path,
-            reduce_by,
-        })
     }
 }
 
