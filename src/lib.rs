@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::process;
 
-use image::{ImageBuffer, Pixel, RgbImage};
+use image::{GrayImage, ImageBuffer, Pixel, RgbImage};
 use imageproc::gradients;
 
 #[cfg(test)]
@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn check_energy_calc() {
+    fn check_upper_edge_pixels() {
         let img = image::open(Path::new("images/test_image.jpg"))
             .unwrap()
             .to_rgb();
@@ -117,54 +117,8 @@ mod tests {
         let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
-        assert_eq!(33822, opened_image.pixel_energy((0, 0)));
-    }
-
-    #[test]
-    fn adjacency_test_corner_pixels() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let opened_image = OpenImage { img, dims, buffer };
-
-        let top_left_corner: (u32, u32) = (0, 0);
-        let top_left_adjacency = AdjacentPixels {
-            left: (1023, 0),
-            right: (1, 0),
-            up: (0, 693),
-            down: (0, 1),
-        };
-
-        let top_right_corner: (u32, u32) = (1023, 0);
-        let top_right_adjacency = AdjacentPixels {
-            left: (1022, 0),
-            right: (0, 0),
-            up: (1023, 693),
-            down: (1023, 1),
-        };
-
-        assert_eq!(
-            vec![top_left_adjacency, top_right_adjacency],
-            vec![
-                opened_image.get_adjacent_pixels(top_left_corner),
-                opened_image.get_adjacent_pixels(top_right_corner)
-            ]
-        );
-    }
-
-    #[test]
-    fn check_lower_edge_pixels() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let opened_image = OpenImage { img, dims, buffer };
-
-        println!("{:?}", opened_image.get_lower_edges((3, 4)).unwrap());
-        println!("{:?}", opened_image.get_lower_edges((0, 0)).unwrap());
+        println!("{:?}", opened_image.get_upper_edges((3, 4)).unwrap());
+        println!("{:?}", opened_image.get_upper_edges((1, 0)).unwrap());
     }
 
     #[test]
@@ -251,113 +205,29 @@ pub struct OpenImage {
     pub buffer: Vec<Vec<[u8; 3]>>,
 }
 
-#[derive(Debug)]
-pub struct AdjacentPixels {
-    pub left: (u32, u32),
-    pub right: (u32, u32),
-    pub up: (u32, u32),
-    pub down: (u32, u32),
-}
-
-impl PartialEq for AdjacentPixels {
-    fn eq(&self, other: &AdjacentPixels) -> bool {
-        self.left == other.left
-            && self.right == other.right
-            && self.up == other.up
-            && self.down == other.down
-    }
-}
-
 impl OpenImage {
-    pub fn pixel_energy(&self, pos: (u32, u32)) -> i32 {
-        // let px = self.img.get_pixel(pos.0, pos.1);
-        // println!("The pixel RGB Vals are {}, {}, {}", px[0], px[1], px[2]);
-        let adj_px = self.get_adjacent_pixels(pos);
-
-        let rx = self.img.get_pixel(adj_px.left.0, adj_px.left.1)[0] as i32
-            - self.img.get_pixel(adj_px.right.0, adj_px.right.1)[0] as i32;
-        let gx = self.img.get_pixel(adj_px.left.0, adj_px.left.1)[1] as i32
-            - self.img.get_pixel(adj_px.right.0, adj_px.right.1)[1] as i32;
-        let bx = self.img.get_pixel(adj_px.left.0, adj_px.left.1)[2] as i32
-            - self.img.get_pixel(adj_px.right.0, adj_px.right.1)[2] as i32;
-
-        let delta_x_squared = (rx * rx) + (gx * gx) + (bx * bx);
-        // println!("dx^2: {}", delta_x_squared);
-
-        let ry = self.img.get_pixel(adj_px.up.0, adj_px.up.1)[0] as i32
-            - self.img.get_pixel(adj_px.down.0, adj_px.down.1)[0] as i32;
-        let gy = self.img.get_pixel(adj_px.up.0, adj_px.up.1)[1] as i32
-            - self.img.get_pixel(adj_px.down.0, adj_px.down.1)[1] as i32;
-        let by = self.img.get_pixel(adj_px.up.0, adj_px.up.1)[2] as i32
-            - self.img.get_pixel(adj_px.down.0, adj_px.down.1)[2] as i32;
-
-        let delta_y_squared = (ry * ry) + (gy * gy) + (by * by);
-        // println!("dy^2: {}", delta_y_squared);
-
-        delta_x_squared + delta_y_squared
-    }
-
-    fn get_adjacent_pixels(&self, pos: (u32, u32)) -> AdjacentPixels {
-        let (x, y) = pos;
-        let x_left = {
-            if x == 0 {
-                self.dims.0 - 1
-            } else {
-                x - 1
-            }
-        };
-        let x_right = {
-            if x == self.dims.0 - 1 {
-                0
-            } else {
-                x + 1
-            }
-        };
-        let y_up = {
-            if y == 0 {
-                self.dims.1 - 1
-            } else {
-                y - 1
-            }
-        };
-        let y_down = {
-            if y == self.dims.1 - 1 {
-                0
-            } else {
-                y + 1
-            }
-        };
-
-        AdjacentPixels {
-            left: (x_left, pos.1),
-            right: (x_right, pos.1),
-            up: (pos.0, y_up),
-            down: (pos.0, y_down),
-        }
-    }
-
     // for a given index (col, row), this yields a vector of the indexes of the pixels directly
-    // below it
+    // above it
     // Example:
-    // the lower edges for an index (3, 4) would give (2, 5), (3, 5), (4, 5)
-    fn get_lower_edges(&self, pos: (u32, u32)) -> Result<(u32, Vec<(u32, u32)>), &'static str> {
-        let down_row = pos.1 + 1;
-        let mut down_indices: Vec<(u32, u32)> = Vec::new();
+    // the upper edges for an index (3, 4) would give (2, 3), (3, 3), (4, 3)
+    fn get_upper_edges(&self, pos: (u32, u32)) -> Result<(u32, Vec<(u32, u32)>), &'static str> {
+        let up_row = pos.1 - 1;
+        let mut up_indices: Vec<(u32, u32)> = Vec::new();
 
-        if down_row == self.dims.1 - 1 {
-            return Err("Last row reached");
+        if up_row == 0 {
+            return Err("First row reached");
         } else {
-            let possibilities = vec![(pos.0, down_row), (pos.0 + 1, down_row)];
+            let possibilities = vec![(pos.0, up_row), (pos.0 + 1, up_row)];
             if pos.0 > 0 {
-                down_indices.push((pos.0 - 1, down_row));
+                up_indices.push((pos.0 - 1, up_row));
             }
             for (col, _) in possibilities {
                 if col <= self.dims.1 - 1 {
-                    down_indices.push((col, down_row));
+                    up_indices.push((col, up_row));
                 }
             }
 
-            Ok((down_row, down_indices))
+            Ok((up_row, up_indices))
         }
     }
 
@@ -459,16 +329,27 @@ where
     buffer
 }
 
-fn cumulative_energy(buff: &Vec<Vec<[u8; 3]>>) -> Vec<Vec<[u8; 3]>> {
-    for j in 1..=buff.len() {}
-    buff.clone() // placeholder to remove return type error
+fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
+    let sobel = gradients::sobel_gradients(gradient);
+    println!("{:?}", sobel);
+    let mut buffer: Vec<Vec<u16>> = Vec::new();
+    for (_, im) in sobel.enumerate_rows() {
+        let mut row_vec: Vec<u16> = Vec::new();
+        for (_i, (_, _, px)) in im.enumerate() {
+            let px_chans = px.channels();
+            row_vec.push(px_chans[0]);
+        }
+        buffer.push(row_vec);
+    }
+
+    // for r in 1..=buffer.len() {
+    //     let upper_pixels =
+    // }
+    buffer
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let img_base = image::open(Path::new(&config.img_path))?;
-
-    let sg = gradients::sobel_gradients(&img_base.as_luma8().unwrap());
-    println!("{:?}", sg);
 
     let img = img_base.to_rgb();
     let dims = img.dimensions();
