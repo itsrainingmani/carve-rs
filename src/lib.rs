@@ -32,7 +32,7 @@ mod tests {
     fn check_length_after_seam_removal() {
         let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
-        let seam = find_vertical_seam(&opened_image);
+        let seam = opened_image.find_vertical_seam();
         opened_image.remove_vertical_seam(seam);
 
         assert_eq!(
@@ -50,7 +50,7 @@ mod tests {
         let num_seams_to_remove = 20;
 
         for _ in 1..=num_seams_to_remove {
-            let seam = find_vertical_seam(&opened_image);
+            let seam = opened_image.find_vertical_seam();
             opened_image.remove_vertical_seam(seam);
         }
 
@@ -118,7 +118,7 @@ mod tests {
     fn put_red_px() {
         let mut oi = OpenImage::new(&String::from("images/test_image1.png")).unwrap();
         for _ in 1..=80 {
-            let seam = find_vertical_seam(&oi);
+            let seam = oi.find_vertical_seam();
             oi.remove_vertical_seam(seam);
         }
 
@@ -209,6 +209,41 @@ impl OpenImage {
         })
     }
 
+    fn find_vertical_seam(&self) -> Vec<(u32, u32)> {
+        let mut computed_seam: Vec<(u32, u32)> = Vec::new();
+        // Compute the pixel energies for the first row
+        let first_row_energy: Vec<i32> = self
+            .img
+            .rows()
+            .enumerate()
+            .map(|(i, _)| self.pixel_energy((i as u32, 0)))
+            .collect();
+        // Get the minimum pixel energy in the first row
+        let min_energy_pixel = first_row_energy.iter().min().unwrap();
+        let min_energy_pixel_pos = first_row_energy
+            .iter()
+            .position(|&x| x == *min_energy_pixel)
+            .unwrap() as u32;
+        computed_seam.push((min_energy_pixel_pos, 0));
+        loop {
+            match oi.get_lower_edges(*computed_seam.last().unwrap()) {
+                Ok((_, v)) => {
+                    // println!("{:?}", (&r, &v));
+                    let row_energy: Vec<i32> =
+                        v.iter().map(|(i, j)| self.pixel_energy((*i, *j))).collect();
+                    let min_energy_pixel = row_energy.iter().min().unwrap();
+                    let min_energy_pixel_pos = row_energy
+                        .iter()
+                        .position(|&x| x == *min_energy_pixel)
+                        .unwrap();
+                    computed_seam.push(*v.get(min_energy_pixel_pos).unwrap());
+                }
+                Err(_) => break,
+            }
+        }
+        computed_seam
+    }
+
     // TODO
     // This method needs to be modified to also remove the seam from the energy buffer data structure
     fn remove_vertical_seam(&mut self, v_seam: std::vec::Vec<(u32, u32)>) {
@@ -220,46 +255,6 @@ impl OpenImage {
         }
         self.dims.0 = self.dims.0 - 1;
     }
-}
-
-fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
-    let mut computed_seam: Vec<(u32, u32)> = Vec::new();
-
-    // Compute the pixel energies for the first row
-    let first_row_energy: Vec<i32> = oi
-        .img
-        .rows()
-        .enumerate()
-        .map(|(i, _)| oi.pixel_energy((i as u32, 0)))
-        .collect();
-
-    // Get the minimum pixel energy in the first row
-    let min_energy_pixel = first_row_energy.iter().min().unwrap();
-    let min_energy_pixel_pos = first_row_energy
-        .iter()
-        .position(|&x| x == *min_energy_pixel)
-        .unwrap() as u32;
-
-    computed_seam.push((min_energy_pixel_pos, 0));
-
-    loop {
-        match oi.get_lower_edges(*computed_seam.last().unwrap()) {
-            Ok((_, v)) => {
-                // println!("{:?}", (&r, &v));
-                let row_energy: Vec<i32> =
-                    v.iter().map(|(i, j)| oi.pixel_energy((*i, *j))).collect();
-
-                let min_energy_pixel = row_energy.iter().min().unwrap();
-                let min_energy_pixel_pos = row_energy
-                    .iter()
-                    .position(|&x| x == *min_energy_pixel)
-                    .unwrap();
-                computed_seam.push(*v.get(min_energy_pixel_pos).unwrap());
-            }
-            Err(_) => break,
-        }
-    }
-    computed_seam
 }
 
 fn formatted_buffer<P, Container>(img: &ImageBuffer<P, Container>) -> Vec<Vec<[u8; 3]>>
@@ -347,7 +342,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     println!("{}", seam_iterations);
 
     for _ in 1..=seam_iterations {
-        let seam = find_vertical_seam(&opened_image);
+        let seam = opened_image.find_vertical_seam();
         opened_image.remove_vertical_seam(seam);
     }
 
