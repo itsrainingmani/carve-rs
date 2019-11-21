@@ -3,8 +3,8 @@ use std::ops::Deref;
 use std::path::Path;
 use std::process;
 
-use image::{imageops, DynamicImage, ImageBuffer, Pixel, RgbImage};
-use imageproc::*;
+use image::{ImageBuffer, Pixel, RgbImage};
+use imageproc::gradients;
 
 #[cfg(test)]
 mod tests {
@@ -16,7 +16,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         assert_eq!((1024, 694), opened_image.dims);
@@ -28,7 +28,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
         assert_eq!(
             (694, 1024),
@@ -45,7 +45,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let mut opened_image = OpenImage { img, dims, buffer };
 
         let seam = find_vertical_seam(&opened_image);
@@ -66,7 +66,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let mut opened_image = OpenImage { img, dims, buffer };
 
         let num_seams_to_remove = 20;
@@ -100,7 +100,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         for i in 0..dims.1 {
@@ -114,7 +114,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         assert_eq!(33822, opened_image.pixel_energy((0, 0)));
@@ -126,7 +126,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         let top_left_corner: (u32, u32) = (0, 0);
@@ -160,7 +160,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let opened_image = OpenImage { img, dims, buffer };
 
         println!("{:?}", opened_image.get_lower_edges((3, 4)).unwrap());
@@ -173,7 +173,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let oi = OpenImage { img, dims, buffer };
         let first_row_energy: Vec<i32> = oi
             .img
@@ -203,7 +203,7 @@ mod tests {
             .unwrap()
             .to_rgb();
         let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&img);
+        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
         let mut oi = OpenImage { img, dims, buffer };
         for _ in 1..=80 {
             let seam = find_vertical_seam(&oi);
@@ -220,20 +220,6 @@ mod tests {
             image::RGB(8),
         )
         .unwrap();
-    }
-
-    #[test]
-    fn generate_image_gradient_sobel_filter() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .grayscale();
-
-        let gradient_img = imageops::filter3x3(&img, &[1., 2., 1., 0., 0., 0., -1., -2., -1.]);
-        let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&gradient_img);
-        println!("{:?}", buffer);
-        // gradient_img
-        //     .save(Path::new(&"images/sobel_gradient.jpg"))
-        //     .unwrap();
     }
 
     #[test]
@@ -375,31 +361,6 @@ impl OpenImage {
         }
     }
 
-    // for a given index (col, row), this yields a vector of the indexes of the pixels directly
-    // above it
-    // Example:
-    // the upper edges for an index (3, 4) would give (2, 3), (3, 3), (4, 3)
-    fn get_upper_edges(&self, pos: (u32, u32)) -> Result<(u32, Vec<(u32, u32)>), &'static str> {
-        let up_row = pos.1 - 1;
-        let mut up_indices: Vec<(u32, u32)> = Vec::new();
-
-        if up_row == 0 {
-            return Err("First row reached");
-        } else {
-            let possibilities = vec![(pos.0, up_row), (pos.0 + 1, up_row)];
-            if pos.0 > 0 {
-                up_indices.push((pos.0 - 1, up_row));
-            }
-            for (col, _) in possibilities {
-                if col <= self.dims.1 - 1 {
-                    up_indices.push((col, up_row));
-                }
-            }
-
-            Ok((up_row, up_indices))
-        }
-    }
-
     // TODO
     // This method needs to be modified to also remove the seam from the energy buffer data structure
     fn remove_vertical_seam(&mut self, v_seam: std::vec::Vec<(u32, u32)>) {
@@ -462,7 +423,7 @@ fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
 
     loop {
         match oi.get_lower_edges(*computed_seam.last().unwrap()) {
-            Ok((r, v)) => {
+            Ok((_, v)) => {
                 // println!("{:?}", (&r, &v));
                 let row_energy: Vec<i32> =
                     v.iter().map(|(i, j)| oi.pixel_energy((*i, *j))).collect();
@@ -480,7 +441,7 @@ fn find_vertical_seam(oi: &OpenImage) -> std::vec::Vec<(u32, u32)> {
     computed_seam
 }
 
-fn get_formatted_buffer<P, Container>(img: &ImageBuffer<P, Container>) -> Vec<Vec<[u8; 3]>>
+fn formatted_buffer<P, Container>(img: &ImageBuffer<P, Container>) -> Vec<Vec<[u8; 3]>>
 where
     P: Pixel<Subpixel = u8> + 'static,
     Container: Deref<Target = [u8]>,
@@ -504,17 +465,19 @@ fn cumulative_energy(buff: &Vec<Vec<[u8; 3]>>) -> Vec<Vec<[u8; 3]>> {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let img = image::open(Path::new(&config.img_path))?.to_rgb();
+    let img_base = image::open(Path::new(&config.img_path))?;
+
+    let sg = gradients::sobel_gradients(&img_base.as_luma8().unwrap());
+    println!("{:?}", sg);
+
+    let img = img_base.to_rgb();
     let dims = img.dimensions();
 
     // The buffer is now a formatted object that contains the gradient magnitude
     // values for each pixel
     // We can then compute the cumulative energy for the buffer to use in our
     // seam calculations
-    let buffer: Vec<Vec<[u8; 3]>> = get_formatted_buffer(&imageops::filter3x3(
-        &img,
-        &[1., 2., 1., 0., 0., 0., -1., -2., -1.], // Sobel Filter Matrix
-    ));
+    let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
     let mut opened_image = OpenImage { img, dims, buffer };
     let seam_iterations: u32 =
         (opened_image.dims.0 as f32 * (config.reduce_by as f32 / 100.)) as u32;
