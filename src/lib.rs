@@ -12,24 +12,13 @@ mod tests {
 
     #[test]
     fn check_image_dimensions() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let opened_image = OpenImage { img, dims, buffer };
-
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
         assert_eq!((1024, 694), opened_image.dims);
     }
 
     #[test]
     fn check_image_buffer_dimensions() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let opened_image = OpenImage { img, dims, buffer };
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
         assert_eq!(
             (694, 1024),
             (
@@ -41,12 +30,7 @@ mod tests {
 
     #[test]
     fn check_length_after_seam_removal() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let mut opened_image = OpenImage { img, dims, buffer };
+        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
         let seam = find_vertical_seam(&opened_image);
         opened_image.remove_vertical_seam(seam);
@@ -62,13 +46,7 @@ mod tests {
 
     #[test]
     fn multiple_seam_removals() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let mut opened_image = OpenImage { img, dims, buffer };
-
+        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
         let num_seams_to_remove = 20;
 
         for _ in 1..=num_seams_to_remove {
@@ -96,26 +74,16 @@ mod tests {
 
     #[test]
     fn print_rgb_first_row() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let opened_image = OpenImage { img, dims, buffer };
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
-        for i in 0..dims.1 {
+        for i in 0..opened_image.dims.1 {
             println!("{:?}", opened_image.img.get_pixel(0, i));
         }
     }
 
     #[test]
     fn check_upper_edge_pixels() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let opened_image = OpenImage { img, dims, buffer };
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
         println!("{:?}", opened_image.get_upper_edges((3, 4)).unwrap());
         println!("{:?}", opened_image.get_upper_edges((1, 0)).unwrap());
@@ -123,12 +91,7 @@ mod tests {
 
     #[test]
     fn find_min_energy() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let oi = OpenImage { img, dims, buffer };
+        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
         let first_row_energy: Vec<i32> = oi
             .img
             .rows()
@@ -153,12 +116,7 @@ mod tests {
 
     #[test]
     fn put_red_px() {
-        let img = image::open(Path::new("images/test_image1.png"))
-            .unwrap()
-            .to_rgb();
-        let dims = img.dimensions();
-        let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
-        let mut oi = OpenImage { img, dims, buffer };
+        let mut oi = OpenImage::new(&String::from("images/test_image1.png")).unwrap();
         for _ in 1..=80 {
             let seam = find_vertical_seam(&oi);
             oi.remove_vertical_seam(seam);
