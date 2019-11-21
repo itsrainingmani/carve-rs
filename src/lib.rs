@@ -85,8 +85,8 @@ mod tests {
     fn check_upper_edge_pixels() {
         let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
-        println!("{:?}", opened_image.get_upper_edges((3, 4)).unwrap());
-        println!("{:?}", opened_image.get_upper_edges((1, 0)).unwrap());
+        println!("{:?}", get_upper_edges(&opened_image.img, (3, 4)).unwrap());
+        println!("{:?}", get_upper_edges(&opened_image.img, (1, 0)).unwrap());
     }
 
     #[test]
@@ -180,31 +180,6 @@ impl OpenImage {
             buffer,
             energy,
         })
-    }
-
-    // for a given index (col, row), this yields a vector of the indexes of the pixels directly
-    // above it
-    // Example:
-    // the upper edges for an index (3, 4) would give (2, 3), (3, 3), (4, 3)
-    fn get_upper_edges(&self, pos: (u32, u32)) -> Result<(u32, Vec<(u32, u32)>), &'static str> {
-        let up_row = pos.1 - 1;
-        let mut up_indices: Vec<(u32, u32)> = Vec::new();
-
-        if up_row == 0 {
-            return Err("First row reached");
-        } else {
-            let possibilities = vec![(pos.0, up_row), (pos.0 + 1, up_row)];
-            if pos.0 > 0 {
-                up_indices.push((pos.0 - 1, up_row));
-            }
-            for (col, _) in possibilities {
-                if col <= self.dims.1 - 1 {
-                    up_indices.push((col, up_row));
-                }
-            }
-
-            Ok((up_row, up_indices))
-        }
     }
 
     // TODO
@@ -305,6 +280,39 @@ where
     buffer
 }
 
+// for a given index (col, row), this yields a vector of the indexes of the pixels directly
+// above it
+// Example:
+// the upper edges for an index (3, 4) would give (2, 3), (3, 3), (4, 3)
+fn get_upper_edges<P, Container>(
+    img: &ImageBuffer<P, Container>,
+    pos: (u32, u32),
+) -> Result<(u32, Vec<(u32, u32)>), &'static str>
+where
+    P: Pixel<Subpixel = u8> + 'static,
+    Container: Deref<Target = [u8]>,
+{
+    let up_row = pos.1 - 1;
+    let mut up_indices: Vec<(u32, u32)> = Vec::new();
+    let dims = img.dimensions();
+
+    if up_row == 0 {
+        return Err("First row reached");
+    } else {
+        let possibilities = vec![(pos.0, up_row), (pos.0 + 1, up_row)];
+        if pos.0 > 0 {
+            up_indices.push((pos.0 - 1, up_row));
+        }
+        for (col, _) in possibilities {
+            if col <= dims.1 - 1 {
+                up_indices.push((col, up_row));
+            }
+        }
+
+        Ok((up_row, up_indices))
+    }
+}
+
 fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
     let sobel = gradients::sobel_gradients(gradient);
     println!("{:?}", sobel);
@@ -318,9 +326,11 @@ fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
         buffer.push(row_vec);
     }
 
-    // for r in 1..=buffer.len() {
-    //     let upper_pixels =
-    // }
+    for r in buffer.iter() {
+        // for p in *r.iter(){
+        //     let upper_px =
+        // }
+    }
     buffer
 }
 
