@@ -105,25 +105,65 @@ mod tests {
     fn find_min_energy() {
         let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
         // Get the minimum pixel energy in the first row
-        let min_energy_pixel = oi.energy.last().unwrap().iter().min().unwrap();
+        let min_energy_pixel = oi.energy.get(1).unwrap().iter().min().unwrap();
         let min_energy_pixel_pos = oi
             .energy
-            .last()
+            .get(1)
             .unwrap()
             .iter()
             .position(|&x| x == *min_energy_pixel)
             .unwrap() as u32;
 
         println!(
-            "{:?}, {:?}, {:?}",
-            min_energy_pixel,
-            min_energy_pixel_pos,
-            oi.dims.1 - 1
+            "min_energy_px: {:?}, pos: {:?}",
+            min_energy_pixel, min_energy_pixel_pos,
         );
+    }
 
+    #[test]
+    fn show_cumulative_energy() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
+        let sobel_buffer = format_grayscale(&sg);
+        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        for i in 4..7 {
+            println!(
+                "Row 0, Col {:?} -> {:?}",
+                i,
+                oi.energy.get(20).unwrap().get(i).unwrap()
+            );
+        }
         println!(
-            "{:?}",
-            get_upper_edges(&oi.img, (min_energy_pixel_pos, oi.dims.1 - 1))
+            "Row 1, Col 5 -> CumEnergy: {:?}, Gradient: {:?}",
+            oi.energy.get(21).unwrap().get(5).unwrap(),
+            sobel_buffer.get(21).unwrap().get(5).unwrap()
+        );
+    }
+
+    #[test]
+    fn validate_cumulative_energy() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
+        let sobel_buffer = format_grayscale(&sg);
+        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let upper = oi
+            .energy
+            .get(20)
+            .unwrap()
+            .get(4..7)
+            .unwrap()
+            .iter()
+            .min()
+            .unwrap();
+        assert_eq!(
+            *oi.energy.get(21).unwrap().get(5).unwrap(),
+            sobel_buffer.get(21).unwrap().get(5).unwrap() + *upper
         );
     }
 
