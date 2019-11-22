@@ -86,7 +86,7 @@ mod tests {
         let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
         println!("{:?}", get_upper_edges(&opened_image.img, (3, 4)).unwrap());
-        println!("{:?}", get_upper_edges(&opened_image.img, (1, 0)).unwrap());
+        println!("{:?}", get_upper_edges(&opened_image.img, (0, 1)).unwrap());
     }
 
     #[test]
@@ -200,7 +200,7 @@ impl OpenImage {
         let dims = img.dimensions();
         let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
 
-        let energy = cumulative_energy(&img_base.as_luma8().unwrap());
+        let energy = cumulative_energy(img_base.grayscale().as_luma8().unwrap());
 
         Ok(OpenImage {
             img,
@@ -283,13 +283,12 @@ where
     P: Pixel<Subpixel = u8> + 'static,
     Container: Deref<Target = [u8]>,
 {
-    let up_row = pos.1 - 1;
-    let mut up_indices: Vec<(u32, u32)> = Vec::new();
-    let dims = img.dimensions();
-
-    if up_row == 0 {
-        return Err("First row reached");
+    if pos.1 == 0 {
+        return Err("First Row");
     } else {
+        let up_row = pos.1 - 1;
+        let mut up_indices: Vec<(u32, u32)> = Vec::new();
+        let dims = img.dimensions();
         let possibilities = vec![(pos.0, up_row), (pos.0 + 1, up_row)];
         if pos.0 > 0 {
             up_indices.push((pos.0 - 1, up_row));
@@ -325,7 +324,7 @@ where
 fn convert_pos_to_pix<T: Copy>(pos: &[(u32, u32)], buff: &mut Vec<Vec<T>>) -> Vec<T> {
     let mut pxs: Vec<T> = Vec::new();
     for (c, r) in pos {
-        pxs.push(*buff.get(*c as usize).unwrap().get(*r as usize).unwrap());
+        pxs.push(*buff.get(*r as usize).unwrap().get(*c as usize).unwrap());
     }
 
     pxs
@@ -341,7 +340,7 @@ fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
     // Start at 1 since the first row's energy does not change
     for r in 1..=num_rows {
         for c in 0..=num_cols {
-            let (_, ue) = get_upper_edges(gradient, (r as u32, c as u32)).unwrap();
+            let (_, ue) = get_upper_edges(gradient, (c as u32, r as u32)).unwrap();
             let pxs = convert_pos_to_pix(&ue[..], &mut buffer);
             let min_energy = pxs.iter().min().unwrap();
             if let Some(cur_px) = buffer.get_mut(r).unwrap().get_mut(c) {
