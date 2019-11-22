@@ -304,10 +304,13 @@ where
     }
 }
 
-fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
-    let sobel = gradients::sobel_gradients(gradient);
+fn format_grayscale<P, Container>(sb: &ImageBuffer<P, Container>) -> Vec<Vec<u16>>
+where
+    P: Pixel<Subpixel = u16> + 'static,
+    Container: Deref<Target = [u16]>,
+{
     let mut buffer: Vec<Vec<u16>> = Vec::new();
-    for (_, im) in sobel.enumerate_rows() {
+    for (_, im) in sb.enumerate_rows() {
         let mut row_vec: Vec<u16> = Vec::new();
         for (_i, (_, _, px)) in im.enumerate() {
             let px_chans = px.channels();
@@ -316,17 +319,37 @@ fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
         buffer.push(row_vec);
     }
 
-    for (r, row) in buffer.iter_mut().enumerate() {
-        for (c, px) in row.iter_mut().enumerate() {
+    buffer
+}
+
+fn convert_pos_to_pix<T: Copy>(pos: &[(u32, u32)], buff: &mut Vec<Vec<T>>) -> Vec<T> {
+    let mut pxs: Vec<T> = Vec::new();
+    for (c, r) in pos {
+        pxs.push(*buff.get(*c as usize).unwrap().get(*r as usize).unwrap());
+    }
+
+    pxs
+}
+
+fn cumulative_energy(gradient: &GrayImage) -> Vec<Vec<u16>> {
+    let sobel = gradients::sobel_gradients(gradient);
+    let mut buffer = format_grayscale(&sobel);
+
+    let num_rows = buffer.len() - 1;
+    let num_cols = buffer.first().unwrap().len() - 1;
+
+    // Start at 1 since the first row's energy does not change
+    for r in 1..=num_rows {
+        for c in 0..=num_cols {
             let (_, ue) = get_upper_edges(gradient, (r as u32, c as u32)).unwrap();
-            let actual_energies: u16 = ue
-                .iter()
-                .map(|(x, y)| *buffer.get(*x as usize).unwrap().get(*y as usize).unwrap())
-                .min()
-                .unwrap();
-            *px += actual_energies;
+            let pxs = convert_pos_to_pix(&ue[..], &mut buffer);
+            let min_energy = pxs.iter().min().unwrap();
+            if let Some(cur_px) = buffer.get_mut(r).unwrap().get_mut(c) {
+                *cur_px += min_energy;
+            }
         }
     }
+
     buffer
 }
 
