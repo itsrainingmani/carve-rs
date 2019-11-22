@@ -88,8 +88,8 @@ mod tests {
     fn print_rgb_first_row() {
         let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
-        for i in 0..opened_image.dims.1 {
-            println!("{:?}", opened_image.img.get_pixel(0, i));
+        for i in 0..opened_image.dims.0 {
+            println!("{:?}", opened_image.img.get_pixel(i, 0));
         }
     }
 
@@ -125,26 +125,6 @@ mod tests {
             "{:?}",
             get_upper_edges(&oi.img, (min_energy_pixel_pos, oi.dims.1 - 1))
         );
-    }
-
-    #[test]
-    fn put_red_px() {
-        let mut oi = OpenImage::new(&String::from("images/test_image1.png")).unwrap();
-        for _ in 1..=80 {
-            let seam = oi.find_vertical_seam();
-            oi.remove_vertical_seam(seam);
-        }
-
-        println!("{} by {}", oi.dims.0, oi.dims.1);
-
-        image::save_buffer(
-            Path::new(&"images/seam_test1.jpg"),
-            &oi.buffer.concat().concat(),
-            oi.dims.0,
-            oi.dims.1,
-            image::RGB(8),
-        )
-        .unwrap();
     }
 
     #[test]
