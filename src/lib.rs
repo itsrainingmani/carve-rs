@@ -29,6 +29,18 @@ mod tests {
     }
 
     #[test]
+    fn check_image_energy_dimensions() {
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        assert_eq!(
+            (694, 1024),
+            (
+                opened_image.energy.len(),
+                opened_image.energy.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
     fn check_length_after_seam_removal() {
         let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
 
