@@ -1,11 +1,11 @@
 [package]
-name = "carvers"
+name = "seamstress"
 version = "0.1.0"
-authors = ["Manikandan Sundararajan <tsmanikandan@protonmail.com>"]
-edition = "2018"
+authors = ["Mani Sundararajan"]
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = "0.22.3"
-imageproc = "0.19.2"
+image = "0"
+imageproc = "0"

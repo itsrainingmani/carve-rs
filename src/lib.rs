@@ -6,183 +6,6 @@ use std::process;
 use image::{GrayImage, ImageBuffer, Pixel, RgbImage};
 use imageproc::gradients;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn check_image_dimensions() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        assert_eq!((1024, 694), opened_image.dims);
-    }
-
-    #[test]
-    fn check_image_buffer_dimensions() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        assert_eq!(
-            (694, 1024),
-            (
-                opened_image.buffer.len(),
-                opened_image.buffer.first().unwrap().len()
-            )
-        );
-    }
-
-    #[test]
-    fn check_image_energy_dimensions() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        assert_eq!(
-            (694, 1024),
-            (
-                opened_image.energy.len(),
-                opened_image.energy.first().unwrap().len()
-            )
-        );
-    }
-
-    #[test]
-    fn check_length_after_seam_removal() {
-        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-
-        let seam = opened_image.find_vertical_seam();
-        opened_image.remove_vertical_seam(seam);
-
-        assert_eq!(
-            (694, 1023),
-            (
-                opened_image.buffer.len(),
-                opened_image.buffer.first().unwrap().len()
-            )
-        );
-    }
-
-    #[test]
-    fn multiple_seam_removals() {
-        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        let num_seams_to_remove = 20;
-
-        for _ in 1..=num_seams_to_remove {
-            let seam = opened_image.find_vertical_seam();
-            opened_image.remove_vertical_seam(seam);
-        }
-
-        image::save_buffer(
-            Path::new(&"images/seam_test1_test.jpg"),
-            &opened_image.buffer.concat().concat(),
-            opened_image.dims.0,
-            opened_image.dims.1,
-            image::RGB(8),
-        )
-        .unwrap();
-
-        assert_eq!(
-            (694, 1004),
-            (
-                opened_image.buffer.len(),
-                opened_image.buffer.first().unwrap().len()
-            )
-        );
-    }
-
-    #[test]
-    fn print_rgb_first_row() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-
-        for i in 0..opened_image.dims.0 {
-            println!("{:?}", opened_image.img.get_pixel(i, 0));
-        }
-    }
-
-    #[test]
-    fn check_upper_edge_pixels() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-
-        println!("{:?}", get_upper_edges(&opened_image.img, (3, 4)).unwrap());
-        println!("{:?}", get_upper_edges(&opened_image.img, (0, 1)).unwrap());
-    }
-
-    #[test]
-    fn find_min_energy() {
-        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        // Get the minimum pixel energy in the first row
-        let min_energy_pixel = oi.energy.get(1).unwrap().iter().min().unwrap();
-        let min_energy_pixel_pos = oi
-            .energy
-            .get(1)
-            .unwrap()
-            .iter()
-            .position(|&x| x == *min_energy_pixel)
-            .unwrap() as u32;
-
-        println!(
-            "min_energy_px: {:?}, pos: {:?}",
-            min_energy_pixel, min_energy_pixel_pos,
-        );
-    }
-
-    #[test]
-    fn show_cumulative_energy() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .grayscale();
-
-        let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
-        let sobel_buffer = format_grayscale(&sg);
-        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        for i in 4..7 {
-            println!(
-                "Row 0, Col {:?} -> {:?}",
-                i,
-                oi.energy.get(20).unwrap().get(i).unwrap()
-            );
-        }
-        println!(
-            "Row 1, Col 5 -> CumEnergy: {:?}, Gradient: {:?}",
-            oi.energy.get(21).unwrap().get(5).unwrap(),
-            sobel_buffer.get(21).unwrap().get(5).unwrap()
-        );
-    }
-
-    #[test]
-    fn validate_cumulative_energy() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .grayscale();
-
-        let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
-        let sobel_buffer = format_grayscale(&sg);
-        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
-        let upper = oi
-            .energy
-            .get(20)
-            .unwrap()
-            .get(4..7)
-            .unwrap()
-            .iter()
-            .min()
-            .unwrap();
-        assert_eq!(
-            *oi.energy.get(21).unwrap().get(5).unwrap(),
-            sobel_buffer.get(21).unwrap().get(5).unwrap() + *upper
-        );
-    }
-
-    #[test]
-    fn test_rgb_conversions() {
-        let img = image::open(Path::new("images/test_image.jpg"))
-            .unwrap()
-            .grayscale();
-
-        let sg = imageproc::gradients::sobel_gradients(&img.as_luma8().unwrap());
-        println!("{:?}", sg);
-        // img.save(Path::new("images/test_image_gray.jpg")).unwrap();
-        // img.as_rgb8()
-        //     .unwrap()
-        //     .save(Path::new("images/test_image_rgb.jpg"))
-        //     .unwrap();
-    }
-}
-
 #[derive(Debug)]
 pub struct Config {
     pub img_path: String,
@@ -228,7 +51,7 @@ impl OpenImage {
     pub fn new(img_path: &String) -> Result<OpenImage, &'static str> {
         let img_base = image::open(Path::new(img_path)).unwrap();
 
-        let img = img_base.to_rgb();
+        let img = img_base.to_rgb8();
         let dims = img.dimensions();
         let buffer: Vec<Vec<[u8; 3]>> = formatted_buffer(&img);
 
@@ -400,9 +223,186 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
         &opened_image.buffer.concat().concat(),
         opened_image.dims.0,
         opened_image.dims.1,
-        image::RGB(8),
+        image::ColorType::Rgb8,
     )?;
     println!("Seam... Carved");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_image_dimensions() {
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        assert_eq!((1024, 694), opened_image.dims);
+    }
+
+    #[test]
+    fn check_image_buffer_dimensions() {
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        assert_eq!(
+            (694, 1024),
+            (
+                opened_image.buffer.len(),
+                opened_image.buffer.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
+    fn check_image_energy_dimensions() {
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        assert_eq!(
+            (694, 1024),
+            (
+                opened_image.energy.len(),
+                opened_image.energy.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
+    fn check_length_after_seam_removal() {
+        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+
+        let seam = opened_image.find_vertical_seam();
+        opened_image.remove_vertical_seam(seam);
+
+        assert_eq!(
+            (694, 1023),
+            (
+                opened_image.buffer.len(),
+                opened_image.buffer.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
+    fn multiple_seam_removals() {
+        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let num_seams_to_remove = 20;
+
+        for _ in 1..=num_seams_to_remove {
+            let seam = opened_image.find_vertical_seam();
+            opened_image.remove_vertical_seam(seam);
+        }
+
+        image::save_buffer(
+            Path::new(&"images/seam_test1_test.jpg"),
+            &opened_image.buffer.concat().concat(),
+            opened_image.dims.0,
+            opened_image.dims.1,
+            image::ColorType::Rgb8,
+        )
+        .unwrap();
+
+        assert_eq!(
+            (694, 1004),
+            (
+                opened_image.buffer.len(),
+                opened_image.buffer.first().unwrap().len()
+            )
+        );
+    }
+
+    #[test]
+    fn print_rgb_first_row() {
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+
+        for i in 0..opened_image.dims.0 {
+            println!("{:?}", opened_image.img.get_pixel(i, 0));
+        }
+    }
+
+    #[test]
+    fn check_upper_edge_pixels() {
+        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+
+        println!("{:?}", get_upper_edges(&opened_image.img, (3, 4)).unwrap());
+        println!("{:?}", get_upper_edges(&opened_image.img, (0, 1)).unwrap());
+    }
+
+    #[test]
+    fn find_min_energy() {
+        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        // Get the minimum pixel energy in the first row
+        let min_energy_pixel = oi.energy.get(1).unwrap().iter().min().unwrap();
+        let min_energy_pixel_pos = oi
+            .energy
+            .get(1)
+            .unwrap()
+            .iter()
+            .position(|&x| x == *min_energy_pixel)
+            .unwrap() as u32;
+
+        println!(
+            "min_energy_px: {:?}, pos: {:?}",
+            min_energy_pixel, min_energy_pixel_pos,
+        );
+    }
+
+    #[test]
+    fn show_cumulative_energy() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
+        let sobel_buffer = format_grayscale(&sg);
+        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        for i in 4..7 {
+            println!(
+                "Row 0, Col {:?} -> {:?}",
+                i,
+                oi.energy.get(20).unwrap().get(i).unwrap()
+            );
+        }
+        println!(
+            "Row 1, Col 5 -> CumEnergy: {:?}, Gradient: {:?}",
+            oi.energy.get(21).unwrap().get(5).unwrap(),
+            sobel_buffer.get(21).unwrap().get(5).unwrap()
+        );
+    }
+
+    #[test]
+    fn validate_cumulative_energy() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
+        let sobel_buffer = format_grayscale(&sg);
+        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let upper = oi
+            .energy
+            .get(20)
+            .unwrap()
+            .get(4..7)
+            .unwrap()
+            .iter()
+            .min()
+            .unwrap();
+        assert_eq!(
+            *oi.energy.get(21).unwrap().get(5).unwrap(),
+            sobel_buffer.get(21).unwrap().get(5).unwrap() + *upper
+        );
+    }
+
+    #[test]
+    fn test_rgb_conversions() {
+        let img = image::open(Path::new("images/test_image.jpg"))
+            .unwrap()
+            .grayscale();
+
+        let sg = imageproc::gradients::sobel_gradients(&img.as_luma8().unwrap());
+        println!("{:?}", sg);
+        // img.save(Path::new("images/test_image_gray.jpg")).unwrap();
+        // img.as_rgb8()
+        //     .unwrap()
+        //     .save(Path::new("images/test_image_rgb.jpg"))
+        //     .unwrap();
+    }
 }
