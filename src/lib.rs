@@ -1,15 +1,15 @@
-use std::error::Error;
 use std::ops::Deref;
 use std::path::Path;
 use std::process;
+use std::{error::Error, path::PathBuf};
 
 use image::{GrayImage, ImageBuffer, Pixel, RgbImage};
 use imageproc::gradients;
 
 #[derive(Debug)]
 pub struct Config {
-    pub img_path: String,
-    pub reduce_by: u32,
+    pub img_path: PathBuf,
+    pub reduce_by: u8,
 }
 
 impl Config {
@@ -17,7 +17,7 @@ impl Config {
         args.next();
 
         let img_path = match args.next() {
-            Some(arg) => arg,
+            Some(arg) => PathBuf::from(arg),
             None => return Err("No filename specified"),
         };
 
@@ -48,8 +48,8 @@ pub struct OpenImage {
 }
 
 impl OpenImage {
-    pub fn new(img_path: &String) -> Result<OpenImage, &'static str> {
-        let img_base = image::open(Path::new(img_path)).unwrap();
+    pub fn new(img_path: &PathBuf) -> Result<OpenImage, &'static str> {
+        let img_base = image::open(img_path).unwrap();
 
         let img = img_base.to_rgb8();
         let dims = img.dimensions();
@@ -233,16 +233,21 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{path::PathBuf, str::FromStr};
+
+    fn image_path() -> PathBuf {
+        PathBuf::from_str("images/test_image.jpg").unwrap()
+    }
 
     #[test]
     fn check_image_dimensions() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let opened_image = OpenImage::new(&image_path()).unwrap();
         assert_eq!((1024, 694), opened_image.dims);
     }
 
     #[test]
     fn check_image_buffer_dimensions() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let opened_image = OpenImage::new(&image_path()).unwrap();
         assert_eq!(
             (694, 1024),
             (
@@ -254,7 +259,7 @@ mod tests {
 
     #[test]
     fn check_image_energy_dimensions() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let opened_image = OpenImage::new(&image_path()).unwrap();
         assert_eq!(
             (694, 1024),
             (
@@ -266,7 +271,7 @@ mod tests {
 
     #[test]
     fn check_length_after_seam_removal() {
-        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let mut opened_image = OpenImage::new(&image_path()).unwrap();
 
         let seam = opened_image.find_vertical_seam();
         opened_image.remove_vertical_seam(seam);
@@ -282,7 +287,7 @@ mod tests {
 
     #[test]
     fn multiple_seam_removals() {
-        let mut opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let mut opened_image = OpenImage::new(&image_path()).unwrap();
         let num_seams_to_remove = 20;
 
         for _ in 1..=num_seams_to_remove {
@@ -310,7 +315,7 @@ mod tests {
 
     #[test]
     fn print_rgb_first_row() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let opened_image = OpenImage::new(&image_path()).unwrap();
 
         for i in 0..opened_image.dims.0 {
             println!("{:?}", opened_image.img.get_pixel(i, 0));
@@ -319,7 +324,7 @@ mod tests {
 
     #[test]
     fn check_upper_edge_pixels() {
-        let opened_image = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let opened_image = OpenImage::new(&image_path()).unwrap();
 
         println!("{:?}", get_upper_edges(&opened_image.img, (3, 4)).unwrap());
         println!("{:?}", get_upper_edges(&opened_image.img, (0, 1)).unwrap());
@@ -327,7 +332,7 @@ mod tests {
 
     #[test]
     fn find_min_energy() {
-        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let oi = OpenImage::new(&image_path()).unwrap();
         // Get the minimum pixel energy in the first row
         let min_energy_pixel = oi.energy.get(1).unwrap().iter().min().unwrap();
         let min_energy_pixel_pos = oi
@@ -352,7 +357,7 @@ mod tests {
 
         let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
         let sobel_buffer = format_grayscale(&sg);
-        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let oi = OpenImage::new(&image_path()).unwrap();
         for i in 4..7 {
             println!(
                 "Row 0, Col {:?} -> {:?}",
@@ -375,7 +380,7 @@ mod tests {
 
         let sg = gradients::sobel_gradients(&img.as_luma8().unwrap());
         let sobel_buffer = format_grayscale(&sg);
-        let oi = OpenImage::new(&String::from("images/test_image.jpg")).unwrap();
+        let oi = OpenImage::new(&image_path()).unwrap();
         let upper = oi
             .energy
             .get(20)
